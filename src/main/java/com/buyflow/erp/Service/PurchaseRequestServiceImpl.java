@@ -179,6 +179,8 @@ BigDecimal calculatedTotalAmount = items.stream()
     ) {
         LocalDateTime now = LocalDateTime.now();
 
+        validateCreateRequestDateIsToday(dto.requestDate());
+
         PurchaseRequest request = new PurchaseRequest();
         Long requestorId = dto.requestorId();
 
@@ -335,7 +337,8 @@ BigDecimal calculatedTotalAmount = items.stream()
                     "구매 요청을 찾을 수 없습니다. ID: " + requestId
             ));
 
-            validateEditableStatus(request);
+        validateEditableStatus(request);
+        validateUpdateRequestDateMatchesCreatedAt(dto.requestDate(), request.getCreatedAt());
 
     if (isBlank(dto.title())) {
         throw new ResponseStatusException(
@@ -697,6 +700,39 @@ public void deletePurchaseRequest(Long requestId) {
 
         return LocalDate.parse(value);
 }
+
+    private void validateCreateRequestDateIsToday(String requestDate) {
+        LocalDate today = LocalDate.now();
+        LocalDate parsedRequestDate = parseRequiredDate(requestDate, "요청일");
+
+        if (!today.equals(parsedRequestDate)) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "요청일은 오늘 날짜만 입력할 수 있습니다."
+            );
+        }
+    }
+
+    private void validateUpdateRequestDateMatchesCreatedAt(
+            String requestDate,
+            LocalDateTime createdAt
+    ) {
+        if (isBlank(requestDate)) {
+            return;
+        }
+
+        LocalDate fixedRequestDate =
+                createdAt != null ? createdAt.toLocalDate() : LocalDate.now();
+
+        LocalDate parsedRequestDate = parseRequiredDate(requestDate, "요청일");
+
+        if (!fixedRequestDate.equals(parsedRequestDate)) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "요청일은 수정할 수 없습니다."
+            );
+        }
+    }
 
     private Long resolveApproverId(Long preferredApproverId, Long requestorId) {
     if (preferredApproverId != null) {

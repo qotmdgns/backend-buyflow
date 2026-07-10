@@ -290,7 +290,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
         PurchaseOrder order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new EntityNotFoundException("발주를 찾을 수 없습니다. ID: " + orderId));
 
-        if ("APPROVED".equals(order.getOrderStatus()) || "CANCELLED".equals(order.getOrderStatus())) {
+        if ("ORDERED".equals(order.getOrderStatus()) || "CANCELLED".equals(order.getOrderStatus())) {
             throw new RuntimeException("이미 승인 완료되거나 취소된 발주는 수정할 수 없습니다.");
         }
 
@@ -317,7 +317,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
             order.setDueDate(request.getExpectedReceiptTo().atStartOfDay()
 					.plusHours(23)
 					.plusMinutes(59)
-					.plusSeconds(59));   // LocalDateTime
+					.plusSeconds(59)); 
         }
         
         if (request.getMemo() != null) {

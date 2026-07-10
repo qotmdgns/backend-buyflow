@@ -49,6 +49,7 @@ public class PurchaseOrderDto {
 		private String userPhone;
 		private String contact;
 		private LocalDateTime dueDate;
+		private String orderManager;
 		private String orderStatus; // 수정시에 주로 사용
 		
 		private String orderNo;             // 발주 번호
@@ -102,6 +103,7 @@ public class PurchaseOrderDto {
 		private String userPhone;
 		private String contact;
 		private Long createdBy;
+		private String orderManager;
 		private LocalDateTime createdAt;
 		private String orderStatus;
 		private LocalDateTime dueDate;

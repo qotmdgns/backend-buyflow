@@ -95,7 +95,13 @@ public class PurchaseOrderController {
     public ResponseEntity<Map<String, Object>> getFormOptions() {
         Map<String, Object> options = new HashMap<>();
         
+
         options.put("statuses", Arrays.asList("전체", "ORDERED", "CONFIRMED", "CANCELLED"));
+
+        options.put("statuses", Arrays.asList("전체", "PENDING", "ORDERED", "CONFIRMED", "CANCELLED"));
+        
+        // 1. DB에서 엔티티 원본을 가져옵니다.
+
         List<Supplier> actualSuppliers = supplierRepository.findAll(); 
         List<Map<String, Object>> robustSuppliers = new ArrayList<>();
         
@@ -146,6 +152,10 @@ public class PurchaseOrderController {
         PageResponse<PurchaseOrderDto.Response> response = service.getOrderList(condition);
         return ResponseEntity.ok(response);
     }
+
+    
+    // 3. 발주 등록
+
     @PostMapping
     @PreAuthorize(SecurityExpressions.PURCHASE_ORDERS_WRITE)
     public ResponseEntity<PurchaseOrderDto.Response> createOrder(

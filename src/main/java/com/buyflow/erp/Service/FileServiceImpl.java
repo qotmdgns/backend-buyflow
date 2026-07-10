@@ -6,6 +6,7 @@ import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
@@ -25,7 +26,8 @@ public class FileServiceImpl implements FileService {
     private final AttachmentRepository attachmentRepository;
     private final UserRepository usersRepository;
 
-    private final String UPLOAD_DIR = "C:/erp/uploads/";
+    @Value("${app.upload-dir:/app/uploads}")
+    private String uploadDir;
 
     @Override
     public Attachment uploadFile(
@@ -43,27 +45,41 @@ public class FileServiceImpl implements FileService {
             String userName,
             Long requestId
     ) throws IOException {
+
         if (file == null || file.isEmpty()) {
             return null;
         }
 
         String originalName = StringUtils.cleanPath(
-                file.getOriginalFilename() == null ? "attachment" : file.getOriginalFilename()
+                file.getOriginalFilename() == null
+                        ? "attachment"
+                        : file.getOriginalFilename()
         );
-        String extension = FileUploadPolicy.normalizeExtension(originalName);
+
+        String extension =
+                FileUploadPolicy.normalizeExtension(originalName);
+
         FileUploadPolicy.validate(file, extension);
 
         String savedName = UUID.randomUUID() + extension;
-        Path uploadDir = Path.of(UPLOAD_DIR).toAbsolutePath().normalize();
-        Files.createDirectories(uploadDir);
 
-        Path targetPath = uploadDir.resolve(savedName).normalize();
-        if (!targetPath.startsWith(uploadDir)) {
-            throw new IOException("첨부파일 저장 경로가 올바르지 않습니다.");
+        Path uploadPath = Path.of(uploadDir)
+                .toAbsolutePath()
+                .normalize();
+
+        Files.createDirectories(uploadPath);
+
+        Path targetPath = uploadPath
+                .resolve(savedName)
+                .normalize();
+
+        if (!targetPath.startsWith(uploadPath)) {
+            throw new IOException(
+                    "첨부파일 저장 경로가 올바르지 않습니다."
+            );
         }
 
         file.transferTo(targetPath);
-        String filePath = targetPath.toString();
 
         Users user = null;
 
@@ -74,7 +90,7 @@ public class FileServiceImpl implements FileService {
         Attachment attachment = Attachment.builder()
                 .originalName(originalName)
                 .savedName(savedName)
-                .filePath(filePath)
+                .filePath(targetPath.toString())
                 .fileSize(file.getSize())
                 .extension(extension)
                 .uploadedBy(userName)
