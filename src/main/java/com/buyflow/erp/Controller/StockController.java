@@ -8,7 +8,10 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -25,8 +28,11 @@ import com.buyflow.erp.Entity.Product;
 import com.buyflow.erp.Entity.Stock;
 import com.buyflow.erp.Repository.ProductRepository;
 import com.buyflow.erp.Repository.StockRepository;
+import com.buyflow.erp.Repository.UserRepository;
 import com.buyflow.erp.Repository.WarehouseRepository;
+import com.buyflow.erp.Security.SecurityExpressions;
 import com.buyflow.erp.Service.InventoryService;
+import org.springframework.web.server.ResponseStatusException;
 
 import lombok.RequiredArgsConstructor;
 
@@ -44,11 +50,12 @@ public class StockController {
         private final StockRepository stockRepository;
         private final ProductRepository productRepository;
         private final WarehouseRepository warehouseRepository;
+        private final UserRepository userRepository;
         private final InventoryService inventoryService;
         private final ExcelService excelService;
 
         @PostMapping("/{stockId}/adjustments")
-        @PreAuthorize("hasRole('ADMIN') or hasAuthority('stock.adjust')")
+        @PreAuthorize(SecurityExpressions.STOCK_ADJUST)
         public ResponseEntity<InventoryAdjustmentResponse> adjustStock(
                         @PathVariable(name = "stockId") Long stockId,
                         @RequestBody InventoryAdjustmentRequest request) {
@@ -58,6 +65,7 @@ public class StockController {
         }
 
        @GetMapping
+       @PreAuthorize(SecurityExpressions.STOCK_READ)
 public StockListResponse getInventories(
         @RequestParam(name = "itemCode", required = false) String itemCode,
         @RequestParam(name = "itemName", required = false) String itemName,
@@ -153,6 +161,7 @@ public StockListResponse getInventories(
 }
 
         @GetMapping("/filter-options")
+        @PreAuthorize(SecurityExpressions.STOCK_READ)
         public Map<String, Object> getFilterOptions() {
 
                 Map<String, Object> result = new HashMap<>();
@@ -260,14 +269,46 @@ public StockListResponse getInventories(
         }
 
         @GetMapping("/excel")
-        public void exportExcel(HttpServletResponse response) throws IOException {
-
-                Users testUser = new Users();
-                testUser.setUserId(5L);
-
+        @PreAuthorize(SecurityExpressions.STOCK_READ)
+        public void exportExcel(HttpServletResponse response, Authentication authentication) throws IOException {
                 excelService.exportExcel(
                                 "inventories",
-                                testUser,
+                                getCurrentUser(authentication),
                                 response);
+        }
+
+        private Users getCurrentUser(Authentication authentication) {
+                if (authentication == null
+                                || !authentication.isAuthenticated()
+                                || "anonymousUser".equals(String.valueOf(authentication.getPrincipal()))) {
+                        throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Login is required");
+                }
+
+                Object principal = authentication.getPrincipal();
+
+                if (principal instanceof Users user && user.getUserId() != null) {
+                        return userRepository.findById(user.getUserId())
+                                        .orElseThrow(() -> new ResponseStatusException(
+                                                        HttpStatus.UNAUTHORIZED,
+                                                        "Current user was not found"));
+                }
+
+                String loginValue = principal instanceof UserDetails userDetails
+                                ? userDetails.getUsername()
+                                : authentication.getName();
+
+                return userRepository.findByLoginId(loginValue)
+                                .orElseGet(() -> {
+                                        try {
+                                                return userRepository.findById(Long.valueOf(loginValue))
+                                                                .orElseThrow(() -> new ResponseStatusException(
+                                                                                HttpStatus.UNAUTHORIZED,
+                                                                                "Current user was not found"));
+                                        } catch (NumberFormatException error) {
+                                                throw new ResponseStatusException(
+                                                                HttpStatus.UNAUTHORIZED,
+                                                                "Current user was not found");
+                                        }
+                                });
         }
 }

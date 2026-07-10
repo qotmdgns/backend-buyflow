@@ -37,6 +37,8 @@ import com.buyflow.erp.Entity.Attachment;
 import com.buyflow.erp.Entity.Users;
 import com.buyflow.erp.Repository.AttachmentRepository;
 import com.buyflow.erp.Repository.UserRepository;
+import com.buyflow.erp.Security.SecurityExpressions;
+import com.buyflow.erp.Service.AttachmentAuthorizationService;
 import com.buyflow.erp.Service.ExcelService;
 import com.buyflow.erp.Service.PurchaseRequestService;
 
@@ -52,8 +54,10 @@ public class PurchaseRequestController {
     private final AttachmentRepository attachmentRepository;
     private final ExcelService excelService;
     private final UserRepository userRepository;
+    private final AttachmentAuthorizationService attachmentAuthorizationService;
 
     @GetMapping
+    @PreAuthorize(SecurityExpressions.PURCHASE_REQUESTS_READ)
     public ResponseEntity<PageResponse<PurchaseRequestDto.ListResponse>> getPurchaseRequests(
             @RequestParam(name = "requestNumber", required = false, defaultValue = "") String requestNumber,
             @RequestParam(name = "title", required = false, defaultValue = "") String title,
@@ -79,16 +83,19 @@ public class PurchaseRequestController {
     }
 
     @GetMapping("/filter-options")
+    @PreAuthorize(SecurityExpressions.PURCHASE_REQUESTS_READ)
     public ResponseEntity<Map<String, Object>> getFilterOptions() {
         return ResponseEntity.ok(purchaseRequestService.getFilterOptions());
     }
 
     @GetMapping("/summary")
+    @PreAuthorize(SecurityExpressions.PURCHASE_REQUESTS_READ)
     public ResponseEntity<PurchaseRequestDto.SummaryResponse> getSummary() {
         return ResponseEntity.ok(purchaseRequestService.getPurchaseRequestSummary());
     }
 
     @GetMapping("/{requestId}")
+    @PreAuthorize(SecurityExpressions.PURCHASE_REQUESTS_READ)
     public ResponseEntity<PurchaseRequestDto.DetailResponse> getPurchaseRequestDetail(
             @PathVariable(name = "requestId") Long requestId
     ) {
@@ -96,7 +103,7 @@ public class PurchaseRequestController {
     }
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasAuthority('purchase-requests.write')")
+    @PreAuthorize(SecurityExpressions.PURCHASE_REQUESTS_WRITE)
     public ResponseEntity<PurchaseRequestDto.DetailResponse> createPurchaseRequest(
             @RequestPart("data") PurchaseRequestDto.CreateRequest request,
             @RequestPart(value = "file", required = false) MultipartFile file
@@ -109,7 +116,7 @@ public class PurchaseRequestController {
             value = "/{requestId}",
             consumes = MediaType.MULTIPART_FORM_DATA_VALUE
     )
-    @PreAuthorize("hasAuthority('purchase-requests.write')")
+    @PreAuthorize(SecurityExpressions.PURCHASE_REQUESTS_WRITE)
     public ResponseEntity<PurchaseRequestDto.DetailResponse> updatePurchaseRequest(
             @PathVariable(name = "requestId") Long requestId,
             @RequestPart("data") PurchaseRequestDto.UpdateRequest request,
@@ -121,7 +128,7 @@ public class PurchaseRequestController {
     }
 
     @PatchMapping("/{requestId}/cancel")
-    @PreAuthorize("hasAuthority('purchase-requests.write')")
+    @PreAuthorize(SecurityExpressions.PURCHASE_REQUESTS_WRITE)
     public ResponseEntity<PurchaseRequestDto.DetailResponse> cancelPurchaseRequest(
             @PathVariable(name = "requestId") Long requestId
     ) {
@@ -131,7 +138,7 @@ public class PurchaseRequestController {
     }
 
     @DeleteMapping("/{requestId}")
-    @PreAuthorize("hasAuthority('purchase-requests.write')")
+    @PreAuthorize(SecurityExpressions.PURCHASE_REQUESTS_WRITE)
     public ResponseEntity<Void> deletePurchaseRequest(
             @PathVariable(name = "requestId") Long requestId
     ) {
@@ -140,14 +147,17 @@ public class PurchaseRequestController {
     }
 
     @GetMapping("/attachments/{attachmentId}/download")
+    @PreAuthorize(SecurityExpressions.PURCHASE_REQUESTS_READ)
     public ResponseEntity<Resource> downloadAttachment(
-            @PathVariable(name = "attachmentId") Long attachmentId
+            @PathVariable(name = "attachmentId") Long attachmentId,
+            Authentication authentication
     ) {
         Attachment attachment = attachmentRepository.findById(attachmentId)
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND,
                         "첨부파일을 찾을 수 없습니다. attachmentId=" + attachmentId
                 ));
+        attachmentAuthorizationService.assertCanDownload(authentication, attachment);
 
         Path path = Path.of(attachment.getFilePath());
 
@@ -178,6 +188,7 @@ public class PurchaseRequestController {
     }
 
     @GetMapping("/excel")
+    @PreAuthorize(SecurityExpressions.PURCHASE_REQUESTS_READ)
     public void exportExcel(HttpServletResponse response) throws IOException {
         Users currentUser = getCurrentUser();
         excelService.exportExcel("purchase-requests", currentUser, response);

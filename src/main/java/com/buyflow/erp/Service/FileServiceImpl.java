@@ -1,17 +1,20 @@
 package com.buyflow.erp.Service;
 
-import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.buyflow.erp.Entity.Attachment;
 import com.buyflow.erp.Entity.Users;
 import com.buyflow.erp.Repository.AttachmentRepository;
 import com.buyflow.erp.Repository.UserRepository;
+import com.buyflow.erp.Security.FileUploadPolicy;
 
 import lombok.RequiredArgsConstructor;
 
@@ -44,23 +47,23 @@ public class FileServiceImpl implements FileService {
             return null;
         }
 
-        File dir = new File(UPLOAD_DIR);
-
-        if (!dir.exists()) {
-            dir.mkdirs();
-        }
-
-        String originalName = file.getOriginalFilename();
-        String extension = "";
-
-        if (originalName != null && originalName.contains(".")) {
-            extension = originalName.substring(originalName.lastIndexOf("."));
-        }
+        String originalName = StringUtils.cleanPath(
+                file.getOriginalFilename() == null ? "attachment" : file.getOriginalFilename()
+        );
+        String extension = FileUploadPolicy.normalizeExtension(originalName);
+        FileUploadPolicy.validate(file, extension);
 
         String savedName = UUID.randomUUID() + extension;
-        String filePath = UPLOAD_DIR + savedName;
+        Path uploadDir = Path.of(UPLOAD_DIR).toAbsolutePath().normalize();
+        Files.createDirectories(uploadDir);
 
-        file.transferTo(new File(filePath));
+        Path targetPath = uploadDir.resolve(savedName).normalize();
+        if (!targetPath.startsWith(uploadDir)) {
+            throw new IOException("첨부파일 저장 경로가 올바르지 않습니다.");
+        }
+
+        file.transferTo(targetPath);
+        String filePath = targetPath.toString();
 
         Users user = null;
 

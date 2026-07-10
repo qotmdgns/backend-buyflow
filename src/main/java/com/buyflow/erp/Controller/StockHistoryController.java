@@ -9,9 +9,14 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 
 import com.buyflow.erp.Dto.StockHistoryResponseDto;
+import com.buyflow.erp.Repository.UserRepository;
 import com.buyflow.erp.Repository.WarehouseRepository;
+import com.buyflow.erp.Security.SecurityExpressions;
 import com.buyflow.erp.Service.StockHistoryService;
 
 import lombok.RequiredArgsConstructor;
@@ -31,8 +36,10 @@ public class StockHistoryController {
         private final StockHistoryService stockHistoryService;
         private final WarehouseRepository warehouseRepository;
         private final ExcelService excelService;
+        private final UserRepository userRepository;
 
         @GetMapping
+        @PreAuthorize(SecurityExpressions.STOCK_HISTORY_READ)
         public List<StockHistoryResponseDto> getStockHistory(
                         @RequestParam(name = "fromDate", required = false) String fromDate,
                         @RequestParam(name = "toDate", required = false) String toDate,
@@ -49,6 +56,7 @@ public class StockHistoryController {
         }
 
         @GetMapping("/type/{historyType}")
+        @PreAuthorize(SecurityExpressions.STOCK_HISTORY_READ)
         public List<StockHistoryResponseDto> getStockHistoryByType(
                         @PathVariable(name = "historyType") String historyType) {
 
@@ -56,6 +64,7 @@ public class StockHistoryController {
         }
 
         @GetMapping("/{historyId}")
+        @PreAuthorize(SecurityExpressions.STOCK_HISTORY_READ)
         public StockHistoryResponseDto getStockHistory(
                         @PathVariable(name = "historyId") Long historyId) {
 
@@ -63,6 +72,7 @@ public class StockHistoryController {
         }
 
         @GetMapping("/filter-options")
+        @PreAuthorize(SecurityExpressions.STOCK_HISTORY_READ)
         public Map<String, Object> getFilterOptions() {
 
                 Map<String, Object> result = new HashMap<>();
@@ -90,14 +100,20 @@ public class StockHistoryController {
         }
 
         @GetMapping("/excel")
-        public void exportExcel(HttpServletResponse response) throws IOException {
-
-                Users testUser = new Users();
-                testUser.setUserId(5L);
-
+        @PreAuthorize(SecurityExpressions.STOCK_HISTORY_READ)
+        public void exportExcel(HttpServletResponse response, Authentication authentication) throws IOException {
                 excelService.exportExcel(
                                 "stock-history",
-                                testUser,
+                                getCurrentUser(authentication),
                                 response);
+        }
+
+        private Users getCurrentUser(Authentication authentication) {
+                if (authentication == null || !authentication.isAuthenticated()) {
+                        throw new AccessDeniedException("권한이 없습니다.");
+                }
+
+                return userRepository.findByLoginId(authentication.getName())
+                                .orElseThrow(() -> new AccessDeniedException("권한이 없습니다."));
         }
 }

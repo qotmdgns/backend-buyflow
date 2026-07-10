@@ -80,7 +80,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
         
         Long userIdToFind = request.getCreatedBy();
         if (userIdToFind == null || userIdToFind <= 0) {
-            userIdToFind = 5L; 
+            throw new IllegalArgumentException("발주 담당자 정보가 없습니다. 로그인 사용자 정보를 확인하세요.");
         }
         
         final Long finalUserId = userIdToFind;

@@ -7,6 +7,7 @@ import java.util.Map;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -19,6 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.buyflow.erp.Dto.PageResponse;
 import com.buyflow.erp.Dto.WarehouseDto;
+import com.buyflow.erp.Security.SecurityExpressions;
 import com.buyflow.erp.Service.WarehouseService;
 
 import lombok.RequiredArgsConstructor;
@@ -32,6 +34,7 @@ public class WarehouseController {
 
     // 목록 조회
     @GetMapping
+    @PreAuthorize(SecurityExpressions.WAREHOUSES_READ)
     public ResponseEntity<PageResponse<WarehouseDto.HouseList>> getWarehouseList(
         WarehouseDto.SearchCondition condition) { // 파라미터가 자동으로 DTO 객체 안에 쏙 들어갑니다.
     
@@ -40,7 +43,8 @@ public class WarehouseController {
     }
     
 
-    @GetMapping("/filter-options") 
+    @GetMapping("/filter-options")
+    @PreAuthorize(SecurityExpressions.WAREHOUSES_READ)
     public ResponseEntity<Map<String, List<String>>> getFilterOptions() {
         
         Map<String, List<String>> options = new HashMap<>();
@@ -53,6 +57,7 @@ public class WarehouseController {
     
     // 단건 조회
     @GetMapping("/{warehouseCode}")
+    @PreAuthorize(SecurityExpressions.WAREHOUSES_READ)
     public ResponseEntity<WarehouseDto.Detail> getWarehouse(
     		@PathVariable(name = "warehouseCode") String warehouseCode) {
     	return ResponseEntity.ok(warehouseService.getWarehouse(warehouseCode));
@@ -60,6 +65,7 @@ public class WarehouseController {
     
     // 창고 등록
     @PostMapping
+    @PreAuthorize(SecurityExpressions.WAREHOUSES_WRITE)
     public ResponseEntity<WarehouseDto.Create> createWarehouse(
     		@RequestBody WarehouseDto.Create request) {
     	WarehouseDto.Create result = warehouseService.createWarehouse(request);
@@ -68,6 +74,7 @@ public class WarehouseController {
     
     // 창고 수정
     @PatchMapping("/{warehouseCode}")
+    @PreAuthorize(SecurityExpressions.WAREHOUSES_WRITE)
     public ResponseEntity<WarehouseDto.Detail> updateWarehouse(
     		@PathVariable(name = "warehouseCode") String warehouseCode, 
     		@RequestBody WarehouseDto.Update request) {
@@ -77,6 +84,7 @@ public class WarehouseController {
     
     // 창고 삭제
     @DeleteMapping("/{warehouseCode}")
+    @PreAuthorize(SecurityExpressions.WAREHOUSES_WRITE)
     public ResponseEntity<Void> deleteWarehouse(@PathVariable(name = "warehouseCode") String warehouseCode) {
     	warehouseService.deleteWarehouse(warehouseCode);
     	return ResponseEntity.noContent().build();

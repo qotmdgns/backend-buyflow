@@ -41,13 +41,21 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(
                                 "/health",
+                                "/api/health",
                                 "/auth/login",
+                                "/api/auth/login",
                                 "/auth/signup",
+                                "/api/auth/signup",
                                 "/auth/find-login-id/**",
+                                "/api/auth/find-login-id/**",
                                 "/auth/reset-password",
+                                "/api/auth/reset-password",
                                 "/auth/reset-password/**",
+                                "/api/auth/reset-password/**",
                                 "/swagger-ui/**",
+                                "/api/swagger-ui/**",
                                 "/v3/api-docs/**",
+                                "/api/v3/api-docs/**",
                                 "/actuator/**"
                         ).permitAll()
                         .requestMatchers(
@@ -58,7 +66,7 @@ public class SecurityConfig {
                                 "/admin/**",
                                 "/suppliers/**"
                         ).authenticated()
-                        .anyRequest().permitAll()
+                        .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 

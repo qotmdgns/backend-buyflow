@@ -48,5 +48,7 @@ public interface PurchaseOrderRepository extends JpaRepository<PurchaseOrder, Lo
     
     @Query("SELECT MAX(p.orderNo) FROM PurchaseOrder p WHERE p.orderNo LIKE :prefix")
     String findMaxOrderNoByToday(@Param("prefix") String prefix);
+
+    boolean existsByAttachment_AttachmentId(Long attachmentId);
     
 }

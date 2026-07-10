@@ -44,6 +44,8 @@ import com.buyflow.erp.Repository.AttachmentRepository;
 
 import com.buyflow.erp.Repository.SupplierRepository;
 import com.buyflow.erp.Repository.UserRepository;
+import com.buyflow.erp.Security.SecurityExpressions;
+import com.buyflow.erp.Service.AttachmentAuthorizationService;
 import com.buyflow.erp.Service.ExcelService;
 import com.buyflow.erp.Service.FileService;
 import com.buyflow.erp.Service.PurchaseOrderService;
@@ -67,17 +69,34 @@ public class PurchaseOrderController {
     private final FileService fileService;
     private final AttachmentRepository attachmentRepository;
     private final ExcelService excelService;
+    private final AttachmentAuthorizationService attachmentAuthorizationService;
+
+    @GetMapping("/filter-options")
+    @PreAuthorize(SecurityExpressions.PURCHASE_ORDERS_READ)
+    public ResponseEntity<Map<String, Object>> getFilterOptions() {
+        Map<String, Object> options = new HashMap<>();
+        options.put("statuses", Arrays.asList("전체", "ORDERED", "CONFIRMED", "CANCELLED"));
+
+        List<Map<String, Object>> suppliers = supplierRepository.findAll().stream()
+                .map(supplier -> {
+                    Map<String, Object> map = new HashMap<>();
+                    map.put("supplierId", supplier.getSupplierId());
+                    map.put("supplierName", supplier.getSupplierName());
+                    return map;
+                })
+                .collect(Collectors.toList());
+        options.put("suppliers", suppliers);
+
+        return ResponseEntity.ok(options);
+    }
     
     @GetMapping("/form-options")
+    @PreAuthorize(SecurityExpressions.PURCHASE_ORDERS_WRITE)
     public ResponseEntity<Map<String, Object>> getFormOptions() {
         Map<String, Object> options = new HashMap<>();
         
         options.put("statuses", Arrays.asList("전체", "ORDERED", "CONFIRMED", "CANCELLED"));
-        
-        // 1. DB에서 엔티티 원본을 가져옵니다.
         List<Supplier> actualSuppliers = supplierRepository.findAll(); 
-
-        // 2. 루프를 돌며 데이터를 가공하고, 동시에 콘솔에 원본 값을 찍어봅니다.
         List<Map<String, Object>> robustSuppliers = new ArrayList<>();
         
         for (Supplier supplier : actualSuppliers) {
@@ -91,8 +110,6 @@ public class PurchaseOrderController {
         }
         
         options.put("suppliers", robustSuppliers);
-
-        // 기존 로직 유지
         List<PurchaseRequestDto.ListResponse> approvedRequests = 
                 purchaseRequestService.getApprovedRequestsWithoutPaging();
         options.put("approvedPurchaseRequests", approvedRequests);
@@ -106,34 +123,31 @@ public class PurchaseOrderController {
     }
     
     @GetMapping("/purchase-requests/{requestId}/items")
+    @PreAuthorize(SecurityExpressions.PURCHASE_ORDERS_WRITE)
     public ResponseEntity<List<PurchaseOrderDto.ItemResponse>> getRequestItems(
     		@PathVariable(name = "requestId") Long requestId) {
     	List<PurchaseOrderDto.ItemResponse> items = service.getApprovedRequestItems(requestId);
     	
     	return ResponseEntity.ok(items);
     }
-    
-    // 1. 발주 단건 상세 조회
     @GetMapping("/{orderId}")
+    @PreAuthorize(SecurityExpressions.PURCHASE_ORDERS_READ)
     public ResponseEntity<PurchaseOrderDto.Response> getOrder(
     		@PathVariable(name= "orderId") Long orderId) { 
     	PurchaseOrderDto.Response response = service.getOrderWithItems(orderId);
         return ResponseEntity.ok(response);
     }
 
-    // 2. 발주 목록 조회
     @GetMapping
+    @PreAuthorize(SecurityExpressions.PURCHASE_ORDERS_READ)
     public ResponseEntity<PageResponse<PurchaseOrderDto.Response>> getOrderList(
         PurchaseOrderDto.SearchCondition condition) {
         
         PageResponse<PurchaseOrderDto.Response> response = service.getOrderList(condition);
         return ResponseEntity.ok(response);
     }
-    
-    
-    // 3. 발주 등록
     @PostMapping
-    @PreAuthorize("hasAuthority('purchase-orders.write')")
+    @PreAuthorize(SecurityExpressions.PURCHASE_ORDERS_WRITE)
     public ResponseEntity<PurchaseOrderDto.Response> createOrder(
     		@RequestPart("data") PurchaseOrderDto.Request request,
     		@RequestPart(value = "file", required = false) MultipartFile file,
@@ -148,16 +162,11 @@ public class PurchaseOrderController {
     		    request.setAttachmentId(savedFile.getAttachmentId());
             }
     	}
-    	
-    	// 서비스 내부에서 변환 작업까지 끝낸 DTO를 받아와 바로 리턴합니다.
         PurchaseOrderDto.Response response = service.createOrder(request);
         return ResponseEntity.ok(response);
     }
-    
-
-    // 4. 발주 수정
     @PutMapping("/{orderId}")
-    @PreAuthorize("hasAuthority('purchase-orders.write')") 
+    @PreAuthorize(SecurityExpressions.PURCHASE_ORDERS_WRITE) 
     public ResponseEntity<PurchaseOrderDto.Response> updateOrder(
             @PathVariable(name = "orderId") Long orderId,
             @RequestPart("data") PurchaseOrderDto.Request request,
@@ -179,7 +188,7 @@ public class PurchaseOrderController {
     }
 
     @PatchMapping("/{orderId}/cancel")
-    @PreAuthorize("hasAuthority('purchase-orders.write')")
+    @PreAuthorize(SecurityExpressions.PURCHASE_ORDERS_WRITE)
     public ResponseEntity<PurchaseOrderDto.Response> cancelOrder(
             @PathVariable(name = "orderId") Long orderId,
             @RequestBody Map<String, String> request) {
@@ -191,7 +200,7 @@ public class PurchaseOrderController {
     }
     
     @GetMapping("/excel")
-    @PreAuthorize("hasAuthority('purchase-orders.read') or hasAuthority('purchase-orders.write')")
+    @PreAuthorize(SecurityExpressions.PURCHASE_ORDERS_READ)
     public void exportExcel(HttpServletResponse response, Authentication authentication) throws IOException {
     	excelService.exportExcel("orders", getCurrentUser(authentication), response);
     }
@@ -206,29 +215,24 @@ public class PurchaseOrderController {
     }
     
     @GetMapping("/attachments/download/{attachmentId}")
+    @PreAuthorize(SecurityExpressions.PURCHASE_ORDERS_READ)
     public ResponseEntity<Resource> downloadAttachment(
-            @PathVariable("attachmentId") Long attachmentId) {
+            @PathVariable("attachmentId") Long attachmentId,
+            Authentication authentication) {
         try {
-            // 1. DB에서 파일 정보 조회
             Attachment attachment = attachmentRepository.findById(attachmentId)
                     .orElseThrow(() -> new RuntimeException("파일 정보를 찾을 수 없습니다."));
+            attachmentAuthorizationService.assertCanDownload(authentication, attachment);
 
-            // 2. 실제 물리 파일 경로 확인
             Path filePath = Paths.get(attachment.getFilePath());
 
             if (!Files.exists(filePath)) {
                 throw new RuntimeException("서버에 실제 파일이 존재하지 않습니다.");
             }
-
-            // 3. 리소스 생성 (Stream)
             Resource resource = 
                     new InputStreamResource(Files.newInputStream(filePath));
-
-            // 4. 파일명 인코딩 (한글 깨짐 방지)
             String encodedFileName = UriUtils.encode(attachment.getOriginalName(), StandardCharsets.UTF_8);
             String contentDisposition = "attachment; filename=\"" + encodedFileName + "\"";
-
-            // 5. 다운로드 헤더 설정 및 반환
             return ResponseEntity.ok()
                     .header(HttpHeaders.CONTENT_DISPOSITION, contentDisposition)
                     .contentType(MediaType.APPLICATION_OCTET_STREAM)
@@ -242,3 +246,4 @@ public class PurchaseOrderController {
     }
     
 }
+

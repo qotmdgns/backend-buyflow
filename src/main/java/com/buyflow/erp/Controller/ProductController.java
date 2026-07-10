@@ -85,6 +85,7 @@ public class ProductController {
 
 
     @GetMapping("/excel")
+    @PreAuthorize(PRODUCT_READ_AUTHORITY)
     public void downloadProductsExcel(
         @ModelAttribute ProductDto.SearchCondition condition,
         HttpServletResponse response

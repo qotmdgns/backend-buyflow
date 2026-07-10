@@ -406,7 +406,7 @@ public class ApprovalServiceImpl implements ApprovalService {
             case "DRAFT" -> "임시 저장";
             case "PENDING_APPROVAL" -> "승인 대기";
             case "APPROVED" -> "승인 완료";
-            case "REJECTED" -> "반려";
+            case "REJECTED" -> "승인 반려";
             case "ORDERED" -> "발주 완료";
             case "CANCEL_REQUESTED" -> "요청 취소";
             default -> status == null ? "승인 대기" : status;
@@ -566,9 +566,7 @@ public class ApprovalServiceImpl implements ApprovalService {
             || !authentication.isAuthenticated()
             || "anonymousUser".equals(String.valueOf(authentication.getPrincipal()))) {
             throw new ResponseStatusException(
-                HttpStatus.UNAUTHORIZED,
-                "로그인이 필요합니다."
-            );
+                HttpStatus.UNAUTHORIZED, "로그인 사용자 정보를 확인할 수 없습니다.");
         }
         
         Object principal = authentication.getPrincipal();
@@ -587,9 +585,7 @@ public class ApprovalServiceImpl implements ApprovalService {
     private Long resolveLoginUserId(String value) {
         if (isBlank(value)) {
             throw new ResponseStatusException(
-                HttpStatus.UNAUTHORIZED,
-                "?꾩옱 濡쒓렇???ъ슜???뺣낫瑜??뺤씤?????놁뒿?덈떎."
-            );
+                HttpStatus.UNAUTHORIZED, "로그인 사용자 정보를 확인할 수 없습니다.");
         }
 
         return userRepository.findByLoginId(value.trim())
@@ -600,9 +596,7 @@ public class ApprovalServiceImpl implements ApprovalService {
     private Long parseUserId(String value) {
     if (isBlank(value)) {
         throw new ResponseStatusException(
-            HttpStatus.UNAUTHORIZED,
-            "현재 로그인 사용자 정보를 확인할 수 없습니다."
-        );
+            HttpStatus.UNAUTHORIZED, "로그인 사용자 정보를 확인할 수 없습니다.");
     }
 
     String loginValue = value.trim();
@@ -695,19 +689,19 @@ public class ApprovalServiceImpl implements ApprovalService {
         return false;
     }
 
-    // 1. 내가 승인 담당자인 건은 표시
+
     if (Objects.equals(approval.getApproverId(), currentUserId)) {
         return true;
     }
 
-    // 2. 승인 담당자 권한이 없는 일반 사용자는
-    //    본인이 요청한 건이라도 승인 관리 목록에는 표시하지 않음
+
+
     if (!canProcessApproval(currentUserId)) {
         return false;
     }
 
-    // 3. 내가 승인 담당자 권한을 가진 사용자이고,
-    //    해당 구매요청의 요청자가 나이면 표시
+
+
     PurchaseRequest request = purchaseRequestRepository
             .findById(approval.getRequestId())
             .orElse(null);
@@ -741,3 +735,4 @@ public class ApprovalServiceImpl implements ApprovalService {
 }
 
 }
+
