@@ -1,0 +1,41 @@
+ALTER SESSION DISABLE PARALLEL DML;
+ALTER SESSION DISABLE PARALLEL QUERY;
+
+MERGE INTO ROLE_PERMISSIONS rp
+USING (
+    SELECT r.ROLE_ID, p.PERMISSION_ID
+    FROM ROLES r
+    JOIN PERMISSIONS p ON p.PERMISSION_CODE IN (
+        'dashboard.read',
+        'users.read',
+        'users.write',
+        'roles.read',
+        'roles.write'
+    )
+    WHERE r.ROLE_CODE = 'TEAM_MANAGER'
+      AND r.USE_YN = 'Y'
+      AND p.USE_YN = 'Y'
+) src
+ON (rp.ROLE_ID = src.ROLE_ID AND rp.PERMISSION_ID = src.PERMISSION_ID)
+WHEN NOT MATCHED THEN
+    INSERT (ROLE_PERMISSION_ID, ROLE_ID, PERMISSION_ID, CREATED_AT)
+    VALUES (SEQ_ROLE_PERMISSIONS.NEXTVAL, src.ROLE_ID, src.PERMISSION_ID, SYSTIMESTAMP);
+
+COMMIT;
+
+SELECT r.ROLE_CODE,
+       p.PERMISSION_CODE,
+       p.PERMISSION_GROUP,
+       p.USE_YN
+FROM ROLE_PERMISSIONS rp
+JOIN ROLES r ON r.ROLE_ID = rp.ROLE_ID
+JOIN PERMISSIONS p ON p.PERMISSION_ID = rp.PERMISSION_ID
+WHERE r.ROLE_CODE = 'TEAM_MANAGER'
+  AND p.PERMISSION_CODE IN (
+      'dashboard.read',
+      'users.read',
+      'users.write',
+      'roles.read',
+      'roles.write'
+  )
+ORDER BY p.PERMISSION_CODE;

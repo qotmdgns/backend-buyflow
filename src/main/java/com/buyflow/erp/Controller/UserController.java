@@ -33,13 +33,13 @@ public class UserController {
     private final UserService userService;
 
     @GetMapping
-    @PreAuthorize(SecurityExpressions.USERS_READ)
+    @PreAuthorize(SecurityExpressions.ADMIN)
     public ApiResponse<List<UserResponse>> findAll() {
         return ApiResponse.success("사용자 목록 조회 성공", userService.findAll());
     }
 
     @GetMapping("/page")
-    @PreAuthorize(SecurityExpressions.USERS_READ)
+    @PreAuthorize(SecurityExpressions.ADMIN)
     public ApiResponse<PageResponse<UserResponse>> search(
             @RequestParam(name= "keyword", required = false) String keyword,
             @RequestParam(name= "status", required = false) String status,
@@ -55,13 +55,19 @@ public class UserController {
     }
 
     @GetMapping("/{userId}")
-    @PreAuthorize(SecurityExpressions.USERS_READ)
-    public ApiResponse<UserResponse> findById(@PathVariable(name = "userId") Long userId) {
-        return ApiResponse.success("사용자 상세 조회 성공", userService.findById(userId));
+    @PreAuthorize(SecurityExpressions.AUTHENTICATED)
+    public ApiResponse<UserResponse> findById(
+            @PathVariable(name = "userId") Long userId,
+            Authentication authentication
+    ) {
+        return ApiResponse.success(
+                "사용자 상세 조회 성공",
+                userService.findById(userId, authentication.getName(), isAdmin(authentication))
+        );
     }
 
     @PutMapping("/{userId}")
-    @PreAuthorize(SecurityExpressions.USERS_WRITE)
+    @PreAuthorize(SecurityExpressions.AUTHENTICATED)
     public ApiResponse<UserResponse> update(
             @PathVariable(name = "userId") Long userId,
             @Valid @RequestBody UserUpdateRequest request,
@@ -69,23 +75,21 @@ public class UserController {
     ) {
         return ApiResponse.success(
                 "사용자 정보 수정 성공",
-                userService.update(userId, request, authentication.getName(), canManageUsers(authentication))
+                userService.update(userId, request, authentication.getName(), isAdmin(authentication))
         );
     }
 
     @DeleteMapping("/{userId}")
-    @PreAuthorize(SecurityExpressions.USERS_WRITE)
+    @PreAuthorize(SecurityExpressions.ADMIN)
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void deactivate(@PathVariable(name = "userId") Long userId, Authentication authentication) {
-        userService.deactivate(userId, authentication.getName(), canManageUsers(authentication));
+    public void deactivate(@PathVariable(name = "userId") Long userId) {
+        userService.deactivate(userId);
     }
 
-    private boolean canManageUsers(Authentication authentication) {
+    private boolean isAdmin(Authentication authentication) {
         return authentication != null && authentication.getAuthorities()
                 .stream()
                 .map(GrantedAuthority::getAuthority)
-                .anyMatch(authority -> PermissionCodes.ROLE_ADMIN.equals(authority)
-                        || PermissionCodes.USERS_WRITE.equals(authority)
-                        || PermissionCodes.LEGACY_USER_MANAGE.equals(authority));
+                .anyMatch(PermissionCodes.ROLE_ADMIN::equals);
     }
 }

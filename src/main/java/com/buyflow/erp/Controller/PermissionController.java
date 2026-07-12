@@ -20,7 +20,7 @@ public class PermissionController {
     private final PermissionService permissionService;
 
     @GetMapping
-    @PreAuthorize(SecurityExpressions.AUTHENTICATED)
+    @PreAuthorize(SecurityExpressions.ROLES_READ)
     public ApiResponse<List<PermissionResponse>> findAll() {
         return ApiResponse.success("권한 목록 조회 성공", permissionService.findAll());
     }

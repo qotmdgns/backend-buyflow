@@ -17,7 +17,6 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
@@ -33,6 +32,7 @@ import com.buyflow.erp.Dto.PageResponse;
 import com.buyflow.erp.Dto.ProductDto;
 import com.buyflow.erp.Entity.Users;
 import com.buyflow.erp.Repository.UserRepository;
+import com.buyflow.erp.Security.SecurityExpressions;
 import com.buyflow.erp.Service.ExcelService;
 import com.buyflow.erp.Service.ProductService;
 
@@ -40,25 +40,17 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 
 
-@CrossOrigin(origins = "http://localhost:3000")
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/products")
 public class ProductController {
-
-    private static final String PRODUCT_READ_AUTHORITY =
-            "hasRole('ADMIN') or hasAuthority('products.read') or hasAuthority('products.write') "
-                    + "or hasAuthority('PRODUCT_READ') or hasAuthority('PRODUCT_WRITE')";
-
-    private static final String PRODUCT_MANAGE_AUTHORITY =
-            "hasRole('ADMIN') or hasAuthority('products.write') or hasAuthority('PRODUCT_WRITE')";
 
     private final ProductService productService;
     private final ExcelService excelService;
     private final UserRepository userRepository;
 
     @PostMapping
-    @PreAuthorize(PRODUCT_MANAGE_AUTHORITY)
+    @PreAuthorize(SecurityExpressions.PRODUCTS_WRITE)
     public ResponseEntity<String> saveProduct(
             @RequestBody ProductDto.CreateRequest request
     ) {
@@ -67,7 +59,7 @@ public class ProductController {
     }
 
     @GetMapping
-    @PreAuthorize(PRODUCT_READ_AUTHORITY)
+    @PreAuthorize(SecurityExpressions.PRODUCTS_READ)
     public ResponseEntity<PageResponse<ProductDto.ListResponse>> getProducts(
             @ModelAttribute ProductDto.SearchCondition condition
     ) {
@@ -76,7 +68,7 @@ public class ProductController {
 
 
     @GetMapping("/filter-options")
-    @PreAuthorize(PRODUCT_READ_AUTHORITY)
+    @PreAuthorize(SecurityExpressions.PRODUCTS_READ)
     public ResponseEntity<Map<String, Object>> getFilterOptions() {
         return ResponseEntity.ok(productService.getFilterOptions());
     }
@@ -85,7 +77,7 @@ public class ProductController {
 
 
     @GetMapping("/excel")
-    @PreAuthorize(PRODUCT_READ_AUTHORITY)
+    @PreAuthorize(SecurityExpressions.PRODUCTS_READ)
     public void downloadProductsExcel(
         @ModelAttribute ProductDto.SearchCondition condition,
         HttpServletResponse response
@@ -162,7 +154,7 @@ public class ProductController {
 
 
     @GetMapping("/{productId}")
-    @PreAuthorize(PRODUCT_READ_AUTHORITY)
+    @PreAuthorize(SecurityExpressions.PRODUCTS_READ)
     public ResponseEntity<ProductDto.ListResponse> getProduct(
             @PathVariable(name = "productId") Long productId
     ) {
@@ -170,7 +162,7 @@ public class ProductController {
     }
 
     @PutMapping("/{productId}")
-    @PreAuthorize(PRODUCT_MANAGE_AUTHORITY)
+    @PreAuthorize(SecurityExpressions.PRODUCTS_WRITE)
     public ResponseEntity<String> updateProduct(
             @PathVariable(name = "productId") Long productId,
             @RequestBody ProductDto.CreateRequest request
@@ -180,7 +172,7 @@ public class ProductController {
     }
 
     @DeleteMapping("/{productId}")
-    @PreAuthorize(PRODUCT_MANAGE_AUTHORITY)
+    @PreAuthorize(SecurityExpressions.PRODUCTS_WRITE)
     public ResponseEntity<String> deleteProduct(
             @PathVariable(name = "productId") Long productId
     ) {

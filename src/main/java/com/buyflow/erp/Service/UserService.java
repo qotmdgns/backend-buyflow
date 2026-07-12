@@ -60,20 +60,22 @@ public class UserService {
         ).map(UserResponse::from));
     }
 
-    public UserResponse findById(Long userId) {
-        return UserResponse.from(findUser(userId));
-    }
-
-    @Transactional
-    public UserResponse update(Long userId, UserUpdateRequest request, String currentLoginId, boolean canManageUsers) {
+    public UserResponse findById(Long userId, String currentLoginId, boolean isAdmin) {
         User target = findUser(userId);
         User currentUser = findCurrentUser(currentLoginId);
 
-        if (!canManageUsers && !target.getUserId().equals(currentUser.getUserId())) {
-            throw new BusinessException(ErrorCode.FORBIDDEN);
-        }
+        requireSelfOrAdmin(target, currentUser, isAdmin);
+        return UserResponse.from(target);
+    }
 
-        if (!canManageUsers && StringUtils.hasText(request.jobRank())) {
+    @Transactional
+    public UserResponse update(Long userId, UserUpdateRequest request, String currentLoginId, boolean isAdmin) {
+        User target = findUser(userId);
+        User currentUser = findCurrentUser(currentLoginId);
+
+        requireSelfOrAdmin(target, currentUser, isAdmin);
+
+        if (!isAdmin && StringUtils.hasText(request.jobRank())) {
             throw new BusinessException(ErrorCode.FORBIDDEN);
         }
 
@@ -89,7 +91,7 @@ public class UserService {
             target.setPhone(normalizeText(request.phone()));
         }
 
-        if (canManageUsers) {
+        if (isAdmin) {
             if (request.departmentName() != null) {
                 target.setDepartmentName(normalizeText(request.departmentName()));
             }
@@ -107,13 +109,8 @@ public class UserService {
     }
 
     @Transactional
-    public void deactivate(Long userId, String currentLoginId, boolean canManageUsers) {
+    public void deactivate(Long userId) {
         User target = findUser(userId);
-        User currentUser = findCurrentUser(currentLoginId);
-
-        if (!canManageUsers && !target.getUserId().equals(currentUser.getUserId())) {
-            throw new BusinessException(ErrorCode.FORBIDDEN);
-        }
 
         target.setStatus("INACTIVE");
         target.setUseYn("N");
@@ -128,6 +125,12 @@ public class UserService {
     private User findCurrentUser(String loginId) {
         return userRepository.findByLoginId(loginId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.UNAUTHORIZED));
+    }
+
+    private void requireSelfOrAdmin(User target, User currentUser, boolean isAdmin) {
+        if (!isAdmin && !target.getUserId().equals(currentUser.getUserId())) {
+            throw new BusinessException(ErrorCode.FORBIDDEN);
+        }
     }
 
     private String normalizeText(String value) {

@@ -13,6 +13,7 @@ import com.buyflow.erp.Repository.ProductRepository;
 import com.buyflow.erp.Repository.PurchaseRequestItemRepository;
 import com.buyflow.erp.Repository.PurchaseRequestRepository;
 import com.buyflow.erp.Repository.UserRepository;
+import com.buyflow.erp.Security.PermissionCodes;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -494,18 +495,18 @@ public class ApprovalServiceImpl implements ApprovalService {
     }
 
     private boolean canReadApprovalManagement(Long userId) {
-        return hasPermission(userId, "approvals.read")
-                || hasPermission(userId, "approvals.process")
+        return hasPermission(userId, PermissionCodes.APPROVALS_READ)
+                || hasPermission(userId, PermissionCodes.APPROVALS_PROCESS)
                 || hasAnyRole(userId, "ADMIN", "MANAGER", "APPROVER", "TEAM_MANAGER");
     }
 
     private boolean canProcessApproval(Long userId) {
-        return hasPermission(userId, "approvals.process")
+        return hasPermission(userId, PermissionCodes.APPROVALS_PROCESS)
                 || hasAnyRole(userId, "ADMIN", "MANAGER", "APPROVER");
 }
 
     private boolean canReadAllApprovals(Long userId) {
-        return hasPermission(userId, "approvals.read")
+        return hasPermission(userId, PermissionCodes.APPROVALS_READ)
                 || hasAnyRole(userId, "ADMIN", "MANAGER", "TEAM_MANAGER");
 }
 
@@ -735,4 +736,3 @@ public class ApprovalServiceImpl implements ApprovalService {
 }
 
 }
-

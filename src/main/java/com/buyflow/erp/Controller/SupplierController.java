@@ -7,6 +7,7 @@ import com.buyflow.erp.Dto.SupplierRequest;
 import com.buyflow.erp.Dto.SupplierResponse;
 import com.buyflow.erp.Dto.SupplierTradeStatusRequest;
 import com.buyflow.erp.Repository.UserRepository;
+import com.buyflow.erp.Security.SecurityExpressions;
 import com.buyflow.erp.Service.ExcelService;
 import com.buyflow.erp.Service.SupplierService;
 import jakarta.validation.Valid;
@@ -36,16 +37,11 @@ import jakarta.servlet.http.HttpServletResponse;
 @RequestMapping("/suppliers")
 public class SupplierController {
 
-    private static final String SUPPLIER_READ_AUTHORITY =
-            "hasRole('ADMIN') or hasAuthority('suppliers.read') or hasAuthority('suppliers.write')";
-    private static final String SUPPLIER_MANAGE_AUTHORITY =
-            "hasRole('ADMIN') or hasAuthority('suppliers.write')";
-
     private final SupplierService supplierService;
     private final ExcelService excelService;
     private final UserRepository userRepository;
     @GetMapping
-    @PreAuthorize(SUPPLIER_READ_AUTHORITY)
+    @PreAuthorize(SecurityExpressions.SUPPLIERS_READ)
     public ApiResponse<SupplierPageResponse> search(
             @RequestParam(name = "supplierCode", required = false) String supplierCode,
             @RequestParam(name = "supplierName", required = false) String supplierName,
@@ -61,13 +57,13 @@ public class SupplierController {
     }
 
     @GetMapping("/filter-options")
-    @PreAuthorize(SUPPLIER_READ_AUTHORITY)
+    @PreAuthorize(SecurityExpressions.SUPPLIERS_READ)
     public ApiResponse<SupplierFilterOptionsResponse> findFilterOptions() {
         return ApiResponse.success("Supplier filter options loaded.", supplierService.findFilterOptions());
     }
 
     @GetMapping("/business-number/exists")
-    @PreAuthorize(SUPPLIER_READ_AUTHORITY)
+    @PreAuthorize(SecurityExpressions.SUPPLIERS_READ)
     public ApiResponse<Boolean> existsBusinessNumber(
             @RequestParam(name = "businessNumber") String businessNumber,
             @RequestParam(name = "excludeSupplierId", required = false) Long excludeSupplierId
@@ -79,25 +75,25 @@ public class SupplierController {
     }
     
     @GetMapping("/excel")
-    @PreAuthorize(SUPPLIER_READ_AUTHORITY)
+    @PreAuthorize(SecurityExpressions.SUPPLIERS_READ)
     public void exportExcel(HttpServletResponse response, Authentication authentication) throws IOException {
         excelService.exportExcel("suppliers", getCurrentUser(authentication), response);
     }
 
     @GetMapping("/{supplierId}")
-    @PreAuthorize(SUPPLIER_READ_AUTHORITY)
+    @PreAuthorize(SecurityExpressions.SUPPLIERS_READ)
     public ApiResponse<SupplierResponse> findById(@PathVariable(name = "supplierId") Long supplierId) {
         return ApiResponse.success("Supplier detail loaded.", supplierService.findById(supplierId));
     }
 
     @PostMapping
-    @PreAuthorize(SUPPLIER_MANAGE_AUTHORITY)
+    @PreAuthorize(SecurityExpressions.SUPPLIERS_WRITE)
     public ApiResponse<SupplierResponse> create(@Valid @RequestBody SupplierRequest request) {
         return ApiResponse.success("Supplier created.", supplierService.create(request));
     }
 
     @PutMapping("/{supplierId}")
-    @PreAuthorize(SUPPLIER_MANAGE_AUTHORITY)
+    @PreAuthorize(SecurityExpressions.SUPPLIERS_WRITE)
     public ApiResponse<SupplierResponse> update(
             @PathVariable(name = "supplierId") Long supplierId,
             @Valid @RequestBody SupplierRequest request
@@ -106,7 +102,7 @@ public class SupplierController {
     }
 
     @PatchMapping("/{supplierId}/trade-status")
-    @PreAuthorize(SUPPLIER_MANAGE_AUTHORITY)
+    @PreAuthorize(SecurityExpressions.SUPPLIERS_WRITE)
     public ApiResponse<SupplierResponse> changeTradeStatus(
             @PathVariable(name = "supplierId") Long supplierId,
             @Valid @RequestBody SupplierTradeStatusRequest request
@@ -118,7 +114,7 @@ public class SupplierController {
     }
 
     @DeleteMapping("/{supplierId}")
-    @PreAuthorize(SUPPLIER_MANAGE_AUTHORITY)
+    @PreAuthorize(SecurityExpressions.SUPPLIERS_WRITE)
     public ApiResponse<Void> delete(@PathVariable(name = "supplierId") Long supplierId) {
         supplierService.delete(supplierId);
         return ApiResponse.success("Supplier deleted.");

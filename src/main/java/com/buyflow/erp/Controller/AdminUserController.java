@@ -8,6 +8,7 @@ import com.buyflow.erp.Dto.AdminUserRoleUpdateRequest;
 import com.buyflow.erp.Dto.AdminUserStatusUpdateRequest;
 import com.buyflow.erp.Dto.PageResponse;
 import com.buyflow.erp.Dto.RoleResponse;
+import com.buyflow.erp.Security.SecurityExpressions;
 import com.buyflow.erp.Service.AdminUserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -32,7 +33,7 @@ public class AdminUserController {
     private final AdminUserService adminUserService;
 
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN') or hasRole('TEAM_MANAGER')")
+    @PreAuthorize(SecurityExpressions.USERS_READ)
     public ApiResponse<List<AdminUserResponse>> findAll(Authentication authentication) {
         return ApiResponse.success(
                 "관리자 사용자 목록 조회 성공",
@@ -41,7 +42,7 @@ public class AdminUserController {
     }
 
     @GetMapping("/page")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('TEAM_MANAGER')")
+    @PreAuthorize(SecurityExpressions.USERS_READ)
     public ApiResponse<PageResponse<AdminUserResponse>> search(
             @RequestParam(name = "keyword", required = false) String keyword,
             @RequestParam(name = "department", required = false) String department,
@@ -72,7 +73,7 @@ public class AdminUserController {
     }
 
     @GetMapping("/{userId}")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('TEAM_MANAGER')")
+    @PreAuthorize(SecurityExpressions.USERS_READ)
     public ApiResponse<AdminUserResponse> findById(
             @PathVariable(name = "userId") Long userId,
             Authentication authentication
@@ -84,22 +85,29 @@ public class AdminUserController {
     }
 
     @PatchMapping("/{userId}/approve")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ApiResponse<AdminUserResponse> approve(@PathVariable(name = "userId") Long userId) {
-        return ApiResponse.success("사용자 승인 성공", adminUserService.approve(userId));
+    @PreAuthorize(SecurityExpressions.USERS_WRITE)
+    public ApiResponse<AdminUserResponse> approve(
+            @PathVariable(name = "userId") Long userId,
+            Authentication authentication
+    ) {
+        return ApiResponse.success("사용자 승인 성공", adminUserService.approve(userId, authentication.getName()));
     }
 
     @PatchMapping("/{userId}/status")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize(SecurityExpressions.USERS_WRITE)
     public ApiResponse<AdminUserResponse> updateStatus(
             @PathVariable(name = "userId") Long userId,
-            @Valid @RequestBody AdminUserStatusUpdateRequest request
+            @Valid @RequestBody AdminUserStatusUpdateRequest request,
+            Authentication authentication
     ) {
-        return ApiResponse.success("사용자 상태 수정 성공", adminUserService.updateStatus(userId, request));
+        return ApiResponse.success(
+                "사용자 상태 수정 성공",
+                adminUserService.updateStatus(userId, request, authentication.getName())
+        );
     }
 
     @PutMapping("/{userId}/profile")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize(SecurityExpressions.USERS_WRITE)
     public ApiResponse<AdminUserResponse> updateProfile(
             @PathVariable(name = "userId") Long userId,
             @Valid @RequestBody AdminUserProfileUpdateRequest request,
@@ -112,7 +120,7 @@ public class AdminUserController {
     }
 
     @PutMapping("/{userId}/roles")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize(SecurityExpressions.USERS_WRITE)
     public ApiResponse<AdminUserResponse> updateRoles(
             @PathVariable(name = "userId") Long userId,
             @Valid @RequestBody AdminUserRoleUpdateRequest request,
@@ -125,7 +133,7 @@ public class AdminUserController {
     }
 
     @PutMapping("/{userId}/department-authorization")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('TEAM_MANAGER')")
+    @PreAuthorize(SecurityExpressions.USERS_WRITE)
     public ApiResponse<AdminUserResponse> updateDepartmentAuthorization(
             @PathVariable(name = "userId") Long userId,
             @Valid @RequestBody AdminUserDepartmentAuthorizationUpdateRequest request,
@@ -138,7 +146,7 @@ public class AdminUserController {
     }
 
     @GetMapping("/departments")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('TEAM_MANAGER')")
+    @PreAuthorize(SecurityExpressions.USERS_READ)
     public ApiResponse<List<String>> findDepartments(Authentication authentication) {
         return ApiResponse.success(
                 "부서 목록 조회 성공",
@@ -147,7 +155,7 @@ public class AdminUserController {
     }
 
     @GetMapping("/assignable-roles")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('TEAM_MANAGER')")
+    @PreAuthorize(SecurityExpressions.USERS_READ)
     public ApiResponse<List<RoleResponse>> findAssignableRoles(Authentication authentication) {
         return ApiResponse.success(
                 "부여 가능 역할 목록 조회 성공",

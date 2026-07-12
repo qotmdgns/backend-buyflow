@@ -3,9 +3,11 @@ package com.buyflow.erp.Controller;
 import com.buyflow.erp.Common.ApiResponse;
 import com.buyflow.erp.Dto.DepartmentPermissionProfileResponse;
 import com.buyflow.erp.Dto.DepartmentPermissionUpdateRequest;
+import com.buyflow.erp.Security.SecurityExpressions;
 import com.buyflow.erp.Service.DepartmentPermissionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -18,37 +20,41 @@ import java.util.List;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/admin/departments")
-@PreAuthorize("hasRole('ADMIN') or hasAuthority('roles.write') or hasAuthority('ROLE_MANAGE')")
 public class DepartmentPermissionController {
 
     private final DepartmentPermissionService departmentPermissionService;
 
     @GetMapping("/permission-profiles")
-    public ApiResponse<List<DepartmentPermissionProfileResponse>> findProfiles() {
+    @PreAuthorize(SecurityExpressions.ROLES_READ)
+    public ApiResponse<List<DepartmentPermissionProfileResponse>> findProfiles(Authentication authentication) {
         return ApiResponse.success(
                 "Department permission profiles loaded.",
-                departmentPermissionService.findProfiles()
+                departmentPermissionService.findProfiles(authentication.getName())
         );
     }
 
     @GetMapping("/{departmentName}/permissions")
+    @PreAuthorize(SecurityExpressions.ROLES_READ)
     public ApiResponse<List<String>> findPermissions(
-            @PathVariable(name = "departmentName") String departmentName
+            @PathVariable(name = "departmentName") String departmentName,
+            Authentication authentication
     ) {
         return ApiResponse.success(
                 "Department permissions loaded.",
-                departmentPermissionService.findPermissionCodes(departmentName)
+                departmentPermissionService.findPermissionCodes(departmentName, authentication.getName())
         );
     }
 
     @PutMapping("/{departmentName}/permissions")
+    @PreAuthorize(SecurityExpressions.ROLES_WRITE)
     public ApiResponse<List<String>> updatePermissions(
             @PathVariable(name = "departmentName") String departmentName,
-            @RequestBody DepartmentPermissionUpdateRequest request
+            @RequestBody DepartmentPermissionUpdateRequest request,
+            Authentication authentication
     ) {
         return ApiResponse.success(
                 "Department permissions saved.",
-                departmentPermissionService.replacePermissions(departmentName, request)
+                departmentPermissionService.replacePermissions(departmentName, request, authentication.getName())
         );
     }
 }

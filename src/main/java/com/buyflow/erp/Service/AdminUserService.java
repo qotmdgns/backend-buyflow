@@ -17,6 +17,7 @@ import com.buyflow.erp.Repository.DepartmentRoleAssignmentRuleRepository;
 import com.buyflow.erp.Repository.RoleRepository;
 import com.buyflow.erp.Repository.AuthUserRepository;
 import com.buyflow.erp.Repository.UserRoleRepository;
+import com.buyflow.erp.Security.PermissionCodes;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -61,7 +62,8 @@ public class AdminUserService {
                     .toList();
         }
 
-        String departmentName = requireTeamManagerDepartment(currentUser);
+        requireUserReadPermission(currentUser);
+        String departmentName = requireScopedDepartment(currentUser);
         return userRepository.findByDepartmentNameScoped(departmentName)
                 .stream()
                 .map(this::toAdminUserResponse)
@@ -84,7 +86,7 @@ public class AdminUserService {
         User currentUser = findUserByLoginId(currentLoginId);
         String effectiveDepartmentName = isAdmin(currentUser)
                 ? normalizeText(departmentName)
-                : requireTeamManagerDepartment(currentUser);
+                : requireScopedDepartment(requireUserReadPermission(currentUser));
 
         PageRequest pageRequest = PageRequest.of(
                 Math.max(page, 0),
@@ -113,8 +115,10 @@ public class AdminUserService {
     }
 
     @Transactional
-    public AdminUserResponse approve(Long userId) {
+    public AdminUserResponse approve(Long userId, String currentLoginId) {
+        User currentUser = findUserByLoginId(currentLoginId);
         User user = findUser(userId);
+        validateWritableTarget(currentUser, user);
         user.setStatus("ACTIVE");
         user.setUseYn("Y");
         user.setUpdatedAt(LocalDateTime.now());
@@ -122,8 +126,14 @@ public class AdminUserService {
         return toAdminUserResponse(user);
     }
     @Transactional
-    public AdminUserResponse updateStatus(Long userId, AdminUserStatusUpdateRequest request) {
+    public AdminUserResponse updateStatus(
+            Long userId,
+            AdminUserStatusUpdateRequest request,
+            String currentLoginId
+    ) {
+        User currentUser = findUserByLoginId(currentLoginId);
         User user = findUser(userId);
+        validateWritableTarget(currentUser, user);
         user.setStatus(request.status());
 
         if (request.useYn() != null) {
@@ -141,7 +151,9 @@ public class AdminUserService {
             AdminUserProfileUpdateRequest request,
             String currentLoginId
     ) {
+        User currentUser = findUserByLoginId(currentLoginId);
         User user = findUser(userId);
+        validateWritableTarget(currentUser, user);
         String nextDepartmentName = request.departmentName() != null
                 ? normalizeText(request.departmentName())
                 : normalizeText(user.getDepartmentName());
@@ -213,7 +225,8 @@ public class AdminUserService {
         User user = findUser(userId);
 
         if (!isAdmin(currentUser)) {
-            requireTeamManagerDepartment(currentUser);
+            requireUserWritePermission(currentUser);
+            requireScopedDepartment(currentUser);
 
             if (isSameUser(user, currentLoginId)) {
                 throw new BusinessException(ErrorCode.FORBIDDEN, "You cannot change your own department authorization.");
@@ -239,7 +252,8 @@ public class AdminUserService {
         User currentUser = findUserByLoginId(currentLoginId);
 
         if (!isAdmin(currentUser)) {
-            return List.of(requireTeamManagerDepartment(currentUser));
+            requireUserReadPermission(currentUser);
+            return List.of(requireScopedDepartment(currentUser));
         }
 
         return userRepository.findDistinctDepartmentNames()
@@ -261,7 +275,8 @@ public class AdminUserService {
                     .toList();
         }
 
-        Set<String> roleCodes = grantableRoleCodesForDepartment(requireTeamManagerDepartment(currentUser));
+        requireUserReadPermission(currentUser);
+        Set<String> roleCodes = grantableRoleCodesForDepartment(requireScopedDepartment(currentUser));
         if (roleCodes.isEmpty()) {
             return List.of();
         }
@@ -303,23 +318,36 @@ public class AdminUserService {
         return hasRole(user.getUserId(), ROLE_ADMIN);
     }
 
-    private boolean isTeamManager(User user) {
-        return hasRole(user.getUserId(), ROLE_TEAM_MANAGER);
-    }
-
     private void validateReadableTarget(User currentUser, User targetUser) {
         if (isAdmin(currentUser)) {
             return;
         }
 
-        requireTeamManagerDepartment(currentUser);
+        requireUserReadPermission(currentUser);
         if (!isSameDepartment(currentUser, targetUser)) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "자기 부서 사용자만 조회할 수 있습니다.");
         }
     }
 
+    private void validateWritableTarget(User currentUser, User targetUser) {
+        if (isAdmin(currentUser)) {
+            return;
+        }
+
+        requireUserWritePermission(currentUser);
+        if (!isSameDepartment(currentUser, targetUser)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "자기 부서 사용자만 수정할 수 있습니다.");
+        }
+
+        Set<String> targetRoleCodes = findRoleCodes(targetUser.getUserId());
+        if (targetRoleCodes.stream().anyMatch(PROTECTED_ROLE_CODES::contains)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "관리자 또는 위임 관리자 역할 보유자는 수정할 수 없습니다.");
+        }
+    }
+
     private void validateDelegatedRoleUpdate(User currentUser, User targetUser, List<Role> requestedRoles) {
-        String departmentName = requireTeamManagerDepartment(currentUser);
+        requireUserWritePermission(currentUser);
+        String departmentName = requireScopedDepartment(currentUser);
 
         if (isSameUser(targetUser, currentUser.getLoginId())) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "본인의 역할은 직접 변경할 수 없습니다.");
@@ -353,14 +381,49 @@ public class AdminUserService {
         }
     }
 
-    private String requireTeamManagerDepartment(User currentUser) {
-        if (!isTeamManager(currentUser)) {
-            throw new BusinessException(ErrorCode.FORBIDDEN, "부서 팀장 역할이 필요합니다.");
+    private User requireUserReadPermission(User currentUser) {
+        if (isAdmin(currentUser) || hasAnyPermission(
+                currentUser,
+                PermissionCodes.USERS_READ,
+                PermissionCodes.USERS_WRITE,
+                PermissionCodes.LEGACY_USER_MANAGE
+        )) {
+            return currentUser;
         }
 
+        throw new BusinessException(ErrorCode.FORBIDDEN, "사용자 조회 권한이 필요합니다.");
+    }
+
+    private User requireUserWritePermission(User currentUser) {
+        if (isAdmin(currentUser) || hasAnyPermission(
+                currentUser,
+                PermissionCodes.USERS_WRITE,
+                PermissionCodes.LEGACY_USER_MANAGE
+        )) {
+            return currentUser;
+        }
+
+        throw new BusinessException(ErrorCode.FORBIDDEN, "사용자 수정 권한이 필요합니다.");
+    }
+
+    private boolean hasAnyPermission(User user, String... permissionCodes) {
+        Set<String> currentPermissionCodes = new LinkedHashSet<>(
+                rbacQueryService.findPermissionCodesByUserId(user.getUserId())
+        );
+
+        for (String permissionCode : permissionCodes) {
+            if (currentPermissionCodes.contains(permissionCode)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private String requireScopedDepartment(User currentUser) {
         String departmentName = normalizeText(currentUser.getDepartmentName());
         if (!StringUtils.hasText(departmentName)) {
-            throw new BusinessException(ErrorCode.FORBIDDEN, "부서 정보가 없는 팀장은 역할을 위임할 수 없습니다.");
+            throw new BusinessException(ErrorCode.FORBIDDEN, "부서 정보가 없는 사용자는 부서 범위 사용자 관리를 할 수 없습니다.");
         }
 
         return departmentName;
